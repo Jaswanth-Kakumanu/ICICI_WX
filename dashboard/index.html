@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic FX pricing engine: results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #eef2f1;
+    --ink: #14282b;
+    --muted: #56696c;
+    --rule: #c5d1cf;
+    --grid: #dbe4e2;
+    --sheet: #a3b1af;
+    --tuned: #4f6669;
+    --dyn: #2f6fba;
+    --inv: #b8235a;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.55 var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 56px 24px 80px; }
+  h1, h2 { font-family: var(--display); font-weight: 700; letter-spacing: -0.015em; margin: 0; }
+  h1 { font-size: clamp(2rem, 4.8vw, 3.3rem); line-height: 1.05; max-width: 22ch; }
+  h2 { font-size: 1.45rem; line-height: 1.2; max-width: 34ch; }
+  p { margin: 0; }
+  .lede { color: var(--muted); max-width: 62ch; }
+  header p { margin-top: 18px; }
+  header .lede { font-size: 1.08rem; color: var(--ink); max-width: 60ch; }
+  header .small { font-size: 0.95rem; color: var(--muted); margin-top: 10px; }
+
+  section { margin-top: 64px; }
+  section > .lede { margin-top: 8px; }
+  .grid { display: grid; gap: 40px 48px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); }
+  .grid > div { min-width: 0; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 11px 10px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; padding-left: 0; }
+  th { font-weight: 500; color: var(--muted); font-size: 0.86rem; white-space: normal; vertical-align: bottom; border-bottom: 1px solid var(--ink); }
+  td { font-size: 0.97rem; }
+  tr.best td { font-weight: 600; }
+  .table-scroll { overflow-x: auto; margin-top: 20px; }
+  .sw { display: inline-block; width: 22px; height: 0; border-top: 3px solid; margin-right: 10px; vertical-align: middle; }
+  .sw.dashed { border-top-style: dashed; }
+  .pos { color: #17703f; }
+  .neg { color: #a02222; }
+  .note { font-size: 0.9rem; color: var(--muted); margin-top: 12px; max-width: 78ch; }
+
+  /* charts */
+  .chart { position: relative; margin-top: 18px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.9rem; margin-bottom: 8px; }
+  .legend span.item { display: inline-flex; align-items: center; }
+  .legend .sw { width: 18px; margin-right: 8px; }
+  .legend .sq { width: 12px; height: 12px; margin-right: 8px; display: inline-block; }
+  svg { display: block; overflow: visible; }
+  svg text { font-family: var(--body); fill: var(--muted); font-size: 12px; }
+  svg .axis-title { font-size: 12px; }
+  svg .mark-label { fill: var(--ink); }
+  .tip {
+    position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--rule);
+    padding: 8px 10px; font-size: 0.85rem; line-height: 1.45; min-width: 150px; z-index: 2;
+    font-variant-numeric: tabular-nums; box-shadow: 0 2px 10px rgba(20,40,43,0.08);
+  }
+  .tip b { font-weight: 600; display: block; margin-bottom: 2px; }
+  .tip .row { display: flex; justify-content: space-between; gap: 14px; }
+  .tip .row span:first-child { display: inline-flex; align-items: center; }
+  .tip .sq { width: 9px; height: 9px; margin-right: 6px; display: inline-block; }
+
+  .tabs { display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
+  .tabs button {
+    font: inherit; font-size: 0.9rem; padding: 6px 14px; border: 1px solid var(--rule);
+    background: transparent; color: var(--ink); cursor: pointer; border-radius: 999px;
+  }
+  .tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .tabs button:focus-visible, a:focus-visible { outline: 3px solid var(--dyn); outline-offset: 2px; }
+
+  .stat-line { display: flex; flex-wrap: wrap; gap: 8px 36px; margin-top: 18px; }
+  .stat-line div { font-size: 0.92rem; color: var(--muted); max-width: 22ch; }
+  .stat-line strong { display: block; font-family: var(--display); font-size: 1.7rem; color: var(--ink); line-height: 1.1; }
+
+  footer { margin-top: 72px; border-top: 1px solid var(--ink); padding-top: 24px; display: grid; gap: 12px; color: var(--muted); font-size: 0.93rem; max-width: 78ch; }
+  footer h2 { font-size: 1.1rem; color: var(--ink); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.88em; background: #e1e9e7; padding: 1px 5px; }
+  .error { padding: 24px; border: 1px solid var(--inv); background: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="error" id="loading">
+    <b>No results found.</b> Run <code>make run</code> in the project folder to generate
+    <code>dashboard/data.js</code>, then reload this page.
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  "use strict";
+  const D = window.FXDATA;
+  if (!D) return;
+
+  // ---------- helpers ----------
+  const COLOR = { static_sheet: "#a3b1af", static_tuned: "#4f6669", dynamic: "#2f6fba", dynamic_inv: "#b8235a" };
+  const LABEL = Object.fromEntries(D.meta.strategies.map((s) => [s.id, s.label]));
+  const MINUS = "\u2212";
+  const nSeeds = D.meta.seeds.length;
+
+  const num = (v, d = 1) => (v < 0 ? MINUS : "") + Math.abs(v).toFixed(d);
+  const signed = (v, d = 1) => (v < 0 ? MINUS : "+") + Math.abs(v).toFixed(d);
+  const pct = (v, d = 1) => signed(v, d) + "%";
+  const usd = (v, d = 2) => {
+    const a = Math.abs(v), s = v < 0 ? MINUS : "";
+    if (a >= 1e6) return s + "$" + (a / 1e6).toFixed(d).replace(/\.0+$/, "") + "M";
+    if (a >= 1e3) return s + "$" + (a / 1e3).toFixed(a >= 1e5 ? 0 : 1).replace(/\.0$/, "") + "k";
+    return s + "$" + a.toFixed(0);
+  };
+  const usdSigned = (v, d = 2) => (v < 0 ? "" : "+") + usd(v, d);
+  const int = (v) => Math.round(v).toLocaleString("en-US");
+  const cls = (v) => (v > 0 ? "pos" : v < 0 ? "neg" : "");
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function niceTicks(lo, hi, n) {
+    n = n || 5;
+    if (!(hi > lo)) { lo -= 1; hi += 1; }
+    const raw = (hi - lo) / n;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+    const out = [];
+    for (let v = Math.floor(lo / step) * step; v <= Math.ceil(hi / step) * step + step / 2; v += step) out.push(+v.toPrecision(12));
+    return out;
+  }
+
+  function legendHTML(items) {
+    return '<div class="legend">' + items.map((s) =>
+      '<span class="item"><span class="sw' + (s.dash ? " dashed" : "") + '" style="border-color:' + s.color + '"></span>' + esc(s.label) + "</span>").join("") + "</div>";
+  }
+
+  // Re-render a chart whenever its container changes width.
+  function responsive(el, render) {
+    let last = -1;
+    const run = () => {
+      const w = Math.floor(el.clientWidth);
+      if (w === last) return;
+      last = w;
+      render();
+    };
+    run();
+    if ("ResizeObserver" in window) new ResizeObserver(run).observe(el);
+    else window.addEventListener("resize", run);
+  }
+
+  // ---------- line chart ----------
+  // o: { x, series:[{label,color,values,dash}], xFormat, yFormat, height, includeZero,
+  //      shade:{from,to,label}, marks:[{x,label}], xTitle, tipTitle }
+  function lineChart(el, o) {
+    const W = Math.max(300, Math.floor(el.clientWidth) || 700), H = o.height || 300;
+    const m = { l: o.marginLeft || 62, r: 14, t: 14, b: o.xTitle ? 54 : 34 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const xs = o.x, xmin = Math.min.apply(null, xs), xmax = Math.max.apply(null, xs);
+    let lo = Infinity, hi = -Infinity;
+    o.series.forEach((s) => s.values.forEach((v) => { if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
+    if (o.includeZero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+    const yt = niceTicks(lo, hi, 5), y0 = yt[0], y1 = yt[yt.length - 1];
+    const X = (v) => m.l + ((v - xmin) / (xmax - xmin || 1)) * iw;
+    const Y = (v) => m.t + (1 - (v - y0) / (y1 - y0)) * ih;
+    const xt = niceTicks(xmin, xmax, Math.max(3, Math.floor(iw / 90))).filter((v) => v >= xmin - 1e-9 && v <= xmax + 1e-9);
+
+    let g = "";
+    if (o.shade) {
+      g += '<rect x="' + X(o.shade.from) + '" y="' + m.t + '" width="' + Math.max(0, X(o.shade.to) - X(o.shade.from)) + '" height="' + ih + '" fill="#c5d1cf" opacity="0.35"/>';
+      g += '<text x="' + (X(o.shade.from) + 6) + '" y="' + (m.t + 14) + '">' + esc(o.shade.label) + "</text>";
+    }
+    yt.forEach((v) => {
+      g += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#dbe4e2"/>';
+      g += '<text x="' + (m.l - 8) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + esc(o.yFormat(v)) + "</text>";
+    });
+    xt.forEach((v) => {
+      g += '<text x="' + X(v) + '" y="' + (H - m.b + 18) + '" text-anchor="middle">' + esc(o.xFormat ? o.xFormat(v) : v) + "</text>";
+    });
+    if (o.xTitle) g += '<text class="axis-title" x="' + (m.l + iw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(o.xTitle) + "</text>";
+    if (o.includeZero && lo < 0 && hi > 0) g += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="#14282b" stroke-width="1.2"/>';
+    (o.marks || []).forEach((mk) => {
+      g += '<line x1="' + X(mk.x) + '" x2="' + X(mk.x) + '" y1="' + m.t + '" y2="' + (m.t + ih) + '" stroke="#14282b" stroke-dasharray="2 4"/>';
+      g += '<text class="mark-label" x="' + (X(mk.x) + 6) + '" y="' + (m.t + 14) + '">' + esc(mk.label) + "</text>";
+    });
+    o.series.forEach((s) => {
+      let d = "", pen = false;
+      s.values.forEach((v, i) => {
+        if (!Number.isFinite(v)) { pen = false; return; }
+        d += (pen ? " L " : " M ") + X(xs[i]).toFixed(1) + " " + Y(v).toFixed(1);
+        pen = true;
+      });
+      g += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="' + (s.width || 2.4) + '" stroke-linejoin="round"' + (s.dash ? ' stroke-dasharray="7 5"' : "") + "/>";
+    });
+    g += '<line class="xh" y1="' + m.t + '" y2="' + (m.t + ih) + '" stroke="#14282b" stroke-width="1" visibility="hidden"/>';
+    o.series.forEach((s, i) => { g += '<circle class="dot" data-i="' + i + '" r="4" fill="' + s.color + '" stroke="#fff" stroke-width="1.5" visibility="hidden"/>'; });
+    g += '<rect class="hit" x="' + m.l + '" y="' + m.t + '" width="' + iw + '" height="' + ih + '" fill="transparent"/>';
+
+    el.innerHTML = legendHTML(o.series) +
+      '<div class="plot" style="position:relative"><svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(o.aria || "Line chart") + '">' + g + '</svg><div class="tip" hidden></div></div>';
+
+    // hover / touch: crosshair + values for the nearest x
+    const svg = el.querySelector("svg"), tip = el.querySelector(".tip"), xh = svg.querySelector(".xh");
+    const dots = svg.querySelectorAll(".dot");
+    const hide = () => { tip.hidden = true; xh.setAttribute("visibility", "hidden"); dots.forEach((d) => d.setAttribute("visibility", "hidden")); };
+    const move = (ev) => {
+      const r = svg.getBoundingClientRect();
+      const px = ev.clientX - r.left;
+      const target = xmin + ((px - m.l) / iw) * (xmax - xmin);
+      let k = 0;
+      for (let i = 1; i < xs.length; i++) if (Math.abs(xs[i] - target) < Math.abs(xs[k] - target)) k = i;
+      const cx = X(xs[k]);
+      xh.setAttribute("x1", cx); xh.setAttribute("x2", cx); xh.setAttribute("visibility", "visible");
+      let rows = "";
+      o.series.forEach((s, i) => {
+        const v = s.values[k];
+        if (Number.isFinite(v)) {
+          dots[i].setAttribute("cx", cx); dots[i].setAttribute("cy", Y(v)); dots[i].setAttribute("visibility", "visible");
+          rows += '<div class="row"><span><i class="sq" style="background:' + s.color + '"></i>' + esc(s.label) + "</span><span>" + esc((o.tipFormat || o.yFormat)(v)) + "</span></div>";
+        } else dots[i].setAttribute("visibility", "hidden");
+      });
+      tip.innerHTML = "<b>" + esc((o.tipTitle || ((v) => v))(xs[k])) + "</b>" + rows;
+      tip.hidden = false;
+      const tw = tip.offsetWidth;
+      tip.style.left = Math.max(0, Math.min(W - tw, cx + 14 + tw > W ? cx - tw - 14 : cx + 14)) + "px";
+      tip.style.top = m.t + 24 + "px";
+    };
+    const hit = svg.querySelector(".hit");
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerdown", move);
+    hit.addEventListener("pointerleave", hide);
+  }
+
+  // ---------- grouped bar chart ----------
+  // o: { groups:[{label, values:[...]}], series:[{label,color}], yFormat, height, xTitle, titleFor }
+  function barChart(el, o) {
+    const W = Math.max(300, Math.floor(el.clientWidth) || 700), H = o.height || 280;
+    const m = { l: 56, r: 10, t: 12, b: o.xTitle ? 54 : 34 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    let lo = 0, hi = 0;
+    o.groups.forEach((gr) => gr.values.forEach((v) => { if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
+    const yt = niceTicks(lo, hi, 5), y0 = yt[0], y1 = yt[yt.length - 1];
+    const Y = (v) => m.t + (1 - (v - y0) / (y1 - y0)) * ih;
+    const gw = iw / o.groups.length, nb = o.series.length;
+    const bw = Math.min(26, (gw * 0.78) / nb), gap = 2;
+    let g = "";
+    yt.forEach((v) => {
+      g += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#dbe4e2"/>';
+      g += '<text x="' + (m.l - 8) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + esc(o.yFormat(v)) + "</text>";
+    });
+    g += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="#14282b" stroke-width="1.2"/>';
+    o.groups.forEach((gr, gi) => {
+      const total = nb * bw + (nb - 1) * gap;
+      const x0 = m.l + gi * gw + (gw - total) / 2;
+      gr.values.forEach((v, si) => {
+        if (!Number.isFinite(v)) return;
+        const top = Math.min(Y(v), Y(0)), h = Math.abs(Y(v) - Y(0));
+        g += '<rect x="' + (x0 + si * (bw + gap)).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + bw + '" height="' + Math.max(h, 1).toFixed(1) + '" fill="' + o.series[si].color + '"><title>' +
+          esc((o.titleFor ? o.titleFor(gr, o.series[si], v) : gr.label + ", " + o.series[si].label + ": " + o.yFormat(v))) + "</title></rect>";
+      });
+      g += '<text x="' + (m.l + gi * gw + gw / 2) + '" y="' + (H - m.b + 18) + '" text-anchor="middle">' + esc(gr.label) + "</text>";
+    });
+    if (o.xTitle) g += '<text class="axis-title" x="' + (m.l + iw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(o.xTitle) + "</text>";
+    el.innerHTML = '<div class="legend">' + o.series.map((s) => '<span class="item"><i class="sq" style="background:' + s.color + '"></i>' + esc(s.label) + "</span>").join("") + "</div>" +
+      '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(o.aria || "Bar chart") + '">' + g + "</svg>";
+  }
+
+  // ---------- numbers used in the copy ----------
+  const A = D.aggregate, best = A.dynamic_inv, plain = A.dynamic, tuned = A.static_tuned;
+  const nWins = best.upliftPctBySeed.filter((v) => v > 0).length;
+  const nWinsSteady = best.steadyUpliftPctBySeed.filter((v) => v > 0).length;
+  const quotesPerMarket = D.meta.days * D.meta.tradesPerDay;
+  const more = (v) => (v >= 0 ? num(v) + "% more" : num(-v) + "% less");
+
+  // ---------- page ----------
+  const rows = D.meta.strategies.map((s) => {
+    const a = A[s.id], isBase = s.id === D.meta.baseline;
+    const up = (v, sd) => (isBase ? '<span style="color:var(--muted)">baseline</span>' : '<span class="' + cls(v) + '">' + pct(v) + "</span> <span style=\"color:var(--muted)\">\u00b1 " + sd.toFixed(1) + "</span>");
+    return "<tr" + (s.id === "dynamic_inv" ? ' class="best"' : "") + '><td><span class="sw" style="border-color:' + COLOR[s.id] + '"></span>' + esc(s.label) + "</td>" +
+      "<td>" + usd(a.corePnlMean) + "</td>" +
+      "<td>" + (s.id === "static_sheet" ? '<span class="' + cls(a.corePnlMean - tuned.corePnlMean) + '">' + pct((a.corePnlMean / tuned.corePnlMean - 1) * 100) + "</span>" : up(a.upliftPctMean, a.upliftPctStd)) + "</td>" +
+      "<td>" + (s.id === "static_sheet" ? '<span class="' + cls(a.steadyPnlMean - tuned.steadyPnlMean) + '">' + pct((a.steadyPnlMean / tuned.steadyPnlMean - 1) * 100) + "</span>" : up(a.steadyUpliftPctMean, a.steadyUpliftPctStd)) + "</td>" +
+      "<td>" + num(a.acceptPct) + "%</td>" +
+      "<td>" + usd(a.avgInventoryUsd, 1) + "</td>" +
+      "<td>" + usd(a.hedgeCostMean) + "</td>" +
+      "<td>" + usd(a.mtmStdMean, 1) + "</td></tr>";
+  }).join("");
+
+  const segRows = D.meta.segments.map((name, i) => {
+    const t = D.segmentStats.static_tuned, d = D.segmentStats.dynamic_inv;
+    const ch = (d.avgSpreadBps[i] / t.avgSpreadBps[i] - 1) * 100;
+    return "<tr><td>" + esc(name) + "</td><td>" + num(t.avgSpreadBps[i]) + " bps</td><td>" + num(d.avgSpreadBps[i]) + " bps</td><td>" + pct(ch, 0) +
+      "</td><td>" + num(t.acceptPct[i], 0) + "% \u2192 " + num(d.acceptPct[i], 0) + "%</td></tr>";
+  }).join("");
+
+  const avgChange = D.meta.segments.reduce((t, _, i) => t + D.segmentStats.dynamic_inv.avgSpreadBps[i] / D.segmentStats.static_tuned.avgSpreadBps[i] - 1, 0) / D.meta.segments.length;
+  const acceptDrop = D.segmentStats.dynamic_inv.acceptPct.reduce((a, b) => a + b, 0) < D.segmentStats.static_tuned.acceptPct.reduce((a, b) => a + b, 0);
+  const hedgeCut = (best.hedgeCostMean / plain.hedgeCostMean - 1) * 100;
+  const invCut = (best.avgInventoryUsd / plain.avgInventoryUsd - 1) * 100;
+  const riskCut = (best.mtmStdMean / plain.mtmStdMean - 1) * 100;
+  const pnlDiff = (best.corePnlMean / plain.corePnlMean - 1) * 100;
+
+  document.getElementById("app").innerHTML =
+    "<header>" +
+      "<h1>Learning each customer\u2019s price response earned " + more(best.steadyUpliftPctMean) + " than a tuned rate sheet</h1>" +
+      '<p class="lede">That is the average over the last ' + (D.meta.days - D.meta.warmupDays) + " of " + D.meta.days + " trading days, once the model has finished learning, across " + nSeeds +
+      " simulated markets. Counting the " + D.meta.warmupDays + "-day learning period as well, the gain is " + pct(best.upliftPctMean) + " \u00b1 " + best.upliftPctStd.toFixed(1) + ".</p>" +
+      '<p class="small">Everything on this page comes from a simulation with made-up customers. Each market has ' + int(D.meta.tradesPerDay) + " quote requests a day for " + D.meta.days + " days, and every pricing strategy sees exactly the same customers.</p>" +
+    "</header>" +
+
+    "<section><h2>Four ways to price the same " + int(quotesPerMarket) + " quote requests</h2>" +
+      '<div class="table-scroll"><table><thead><tr><th>Strategy</th><th>Average profit per market</th><th>Profit vs tuned sheet, all days</th><th>Profit vs tuned sheet, after learning</th><th>Quotes accepted</th><th>Open position at day end</th><th>Hedging cost</th><th>Daily price risk</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      '<p class="note">Profit is spread revenue minus the cost of hedging in the interbank market. Price risk is the standard deviation of daily mark-to-market gains and losses on the open position. The tuned sheet picks the best fixed spread for every segment and currency pair from a separate, longer history, so it is a demanding baseline. Percentages show the mean \u00b1 standard deviation across markets.</p></section>' +
+
+    "<section><h2>The engine starts behind, then pulls ahead</h2>" +
+      '<p class="lede">For its first ' + D.meta.warmupDays + " days the engine quotes random prices around the rate sheet so it can see how customers react (shaded). Each line is cumulative profit minus the tuned sheet\u2019s cumulative profit, averaged over " + nSeeds + " markets. Hover to read values.</p>" +
+      '<div class="chart" id="c-hero"></div></section>' +
+
+    '<section class="grid">' +
+      "<div><h2>The model rediscovers how customers react to price</h2>" +
+        '<p class="lede">Chance that a typical customer accepts a quote at each spread. The solid line is what the model learned from accept and reject outcomes alone. The dashed line is the hidden behaviour the simulator used, which the model never saw.</p>' +
+        '<div class="tabs" id="seg-tabs" role="group" aria-label="Customer segment"></div>' +
+        '<div class="chart" id="c-curve"></div></div>' +
+      "<div><h2>Who pays what</h2>" +
+        '<p class="lede">Average quoted spread per segment after learning, across all currency pairs, in basis points of the mid rate (1 bp = 0.01%).</p>' +
+        '<div class="table-scroll"><table><thead><tr><th>Segment</th><th>Tuned sheet</th><th>Dynamic</th><th>Change</th><th>Accepted</th></tr></thead><tbody>' + segRows + "</tbody></table></div>" +
+        '<p class="note">On average the engine charges ' + (avgChange >= 0 ? "more" : "less") + " than the tuned sheet and " + (acceptDrop ? "wins fewer" : "wins more") + " quotes. What matters is the spread between customers: sensitive ones (large trades, low loyalty, nervous markets) get a sharper price, and customers unlikely to shop around get asked for more. A single fixed spread per segment cannot do that.</p></div>" +
+    "</section>" +
+
+    "<section><h2>Inventory-aware quotes cut hedging and price risk</h2>" +
+      '<p class="lede">When customers pile onto one side, the bank ends up long or short a currency and has to pay to hedge. The inventory-aware engine prices trades that reduce its open position more attractively, and trades that increase it less attractively.</p>' +
+      '<p class="note" style="margin-top:16px">Compared with dynamic pricing that ignores inventory:</p>' +
+      '<div class="stat-line">' +
+        "<div><strong>" + pct(hedgeCut, 0) + "</strong>hedging cost</div>" +
+        "<div><strong>" + pct(invCut, 0) + "</strong>average open position</div>" +
+        "<div><strong>" + pct(riskCut, 0) + "</strong>daily price risk</div>" +
+        "<div><strong>" + pct(pnlDiff, 1) + "</strong>profit</div></div>" +
+      '<div class="chart" id="c-inv"></div></section>' +
+
+    '<section class="grid">' +
+      "<div><h2>" + (nWins === nSeeds ? "Every market beat the tuned sheet" : nWins + " of " + nSeeds + " markets beat the tuned sheet") + "</h2>" +
+        '<p class="lede">Uplift of the inventory-aware engine in each independent market (one random seed each). After learning, ' + nWinsSteady + " of " + nSeeds + " markets are ahead.</p>" +
+        '<div class="chart" id="c-seeds"></div></div>' +
+      "<div><h2>Prediction error falls to the floor</h2>" +
+        '<p class="lede">Log-loss of the predicted acceptance probability each day (lower is better). The floor is the best any model could do from what the bank can observe, since each customer also has a hidden mood that nobody can see. The step up after the shaded days is expected: once the engine quotes near-optimal prices, outcomes get closer to coin flips, which are harder to predict.</p>' +
+        '<div class="chart" id="c-loss"></div></div>' +
+    "</section>" +
+
+    "<footer><h2>How to read these results</h2>" +
+      "<p>The customers, their price sensitivity and the market moves are all simulated with assumptions written in <code>src/config.hpp</code>. Nothing here is real bank data, and the percentages describe this simulated world, not a forecast for a real desk.</p>" +
+      "<p>To regenerate this page with different assumptions, edit the config, run <code>make run</code>, and reload. Use <code>./build/fxprice --seeds 20 --days 90</code> for a longer experiment.</p></footer>";
+
+  // ---------- charts ----------
+  const days = D.curves.day;
+  const cum = D.curves.cumulativePnl, base = cum.static_tuned;
+  const adv = (id) => cum[id].map((v, i) => v - base[i]);
+
+  responsive(document.getElementById("c-hero"), () => lineChart(document.getElementById("c-hero"), {
+    x: days, height: 340, includeZero: true, marginLeft: 70,
+    series: [
+      { label: LABEL.dynamic_inv, color: COLOR.dynamic_inv, values: adv("dynamic_inv"), width: 3 },
+      { label: LABEL.dynamic, color: COLOR.dynamic, values: adv("dynamic") },
+      { label: LABEL.static_sheet, color: COLOR.static_sheet, values: adv("static_sheet") },
+    ],
+    yFormat: (v) => (v === 0 ? "$0" : usdSigned(v, 0)), tipFormat: (v) => usdSigned(v, 0),
+    xFormat: (v) => v, xTitle: "Trading day", tipTitle: (v) => "Day " + v,
+    shade: { from: 1, to: D.meta.warmupDays + 0.5, label: "Exploring" },
+    aria: "Cumulative profit compared with the tuned static rate sheet by trading day",
+  }));
+
+  // price-response curve with segment tabs
+  let segIdx = 0;
+  const tabs = document.getElementById("seg-tabs");
+  const drawCurve = () => {
+    const c = D.acceptanceCurves[segIdx];
+    lineChart(document.getElementById("c-curve"), {
+      x: c.mult.map((m) => m * c.refBps), height: 300, marginLeft: 48,
+      series: [
+        { label: "Learned by the model", color: COLOR.dynamic_inv, values: c.learned.map((v) => v * 100), width: 3 },
+        { label: "Hidden truth", color: "#14282b", values: c.truth.map((v) => v * 100), dash: true, width: 2 },
+      ],
+      yFormat: (v) => num(v, 0) + "%", tipFormat: (v) => num(v, 1) + "%",
+      xFormat: (v) => num(v, c.refBps < 20 ? 1 : 0), xTitle: "Spread quoted (bps), USD/INR, median trade",
+      tipTitle: (v) => num(v, 1) + " bps",
+      marks: [{ x: c.refBps, label: "hand-set sheet" }],
+      aria: "Probability that a " + c.segment + " customer accepts a quote, learned versus true",
+    });
+  };
+  D.acceptanceCurves.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = c.segment; b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    b.addEventListener("click", () => {
+      segIdx = i;
+      tabs.querySelectorAll("button").forEach((x, j) => x.setAttribute("aria-pressed", j === i ? "true" : "false"));
+      drawCurve();
+    });
+    tabs.appendChild(b);
+  });
+  responsive(document.getElementById("c-curve"), drawCurve);
+
+  const inv = D.curves.inventoryUsd;
+  responsive(document.getElementById("c-inv"), () => lineChart(document.getElementById("c-inv"), {
+    x: days, height: 300, marginLeft: 62,
+    series: [
+      { label: LABEL.static_tuned, color: COLOR.static_tuned, values: inv.static_tuned },
+      { label: LABEL.dynamic, color: COLOR.dynamic, values: inv.dynamic },
+      { label: LABEL.dynamic_inv, color: COLOR.dynamic_inv, values: inv.dynamic_inv, width: 3 },
+    ],
+    yFormat: (v) => usd(v, 0), tipFormat: (v) => usd(v, 2),
+    xFormat: (v) => v, xTitle: "Trading day", tipTitle: (v) => "Day " + v,
+    aria: "Average open position at the end of each trading day",
+  }));
+
+  responsive(document.getElementById("c-seeds"), () => barChart(document.getElementById("c-seeds"), {
+    groups: D.meta.seeds.map((s, i) => ({ label: String(s), values: [best.steadyUpliftPctBySeed[i], best.upliftPctBySeed[i]] })),
+    series: [{ label: "After learning", color: COLOR.dynamic_inv }, { label: "All days", color: "#e3a3bd" }],
+    yFormat: (v) => num(v, 0) + "%", xTitle: "Simulated market (random seed)", height: 300,
+    titleFor: (g, s, v) => "Market " + g.label + ", " + s.label.toLowerCase() + ": " + pct(v, 1),
+    aria: "Profit uplift over the tuned sheet in each simulated market",
+  }));
+
+  const ml = D.curves.modelLoss;
+  responsive(document.getElementById("c-loss"), () => lineChart(document.getElementById("c-loss"), {
+    x: days, height: 300, marginLeft: 48,
+    series: [
+      { label: "Model", color: COLOR.dynamic_inv, values: ml.learned, width: 3 },
+      { label: "Best possible", color: "#14282b", values: ml.bestPossible, dash: true, width: 2 },
+    ],
+    yFormat: (v) => v.toFixed(2), tipFormat: (v) => v.toFixed(3),
+    xFormat: (v) => v, xTitle: "Trading day", tipTitle: (v) => "Day " + v,
+    shade: { from: 1, to: D.meta.warmupDays + 0.5, label: "Exploring" },
+    aria: "Prediction error of the acceptance model by trading day compared with the best achievable",
+  }));
+})();
+</script>
+</body>
+</html>
